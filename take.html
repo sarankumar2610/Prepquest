@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrepQuest · Take Test</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script defer src="assets/data.js"></script>
+  <script defer src="assets/app.js"></script>
+  <style>
+    .take-grid { display:grid; grid-template-columns: 1fr 320px; gap:16px; }
+    @media(max-width:920px){ .take-grid { grid-template-columns: 1fr; } }
+    .opts { display:grid; gap:10px; margin-top:12px; }
+    .opt { display:flex; gap:10px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:10px; background: var(--card); cursor:pointer; }
+    .opt input { accent-color: #6c8cff; }
+  </style>
+  <script>
+    function qparam(name) { const u = new URL(location.href); return u.searchParams.get(name); }
+    let state = { attempt: null, test: null, questions: [], idx: 0, qStart: 0, remaining: 0 };
+
+    function render() {
+      const q = state.questions[state.idx];
+      const ans = (state.attempt.answers||[]).find(a=>a.questionId===q.id) || {};
+      document.getElementById('q-meta').textContent = `${q.topic} • ${q.difficulty}`;
+      document.getElementById('stem').textContent = q.stem;
+      const opts = document.getElementById('opts');
+      opts.innerHTML = q.options.map((o,i)=>{
+        const checked = ans.chosenIndex===i ? 'checked' : '';
+        const label = String.fromCharCode(65+i);
+        return `<label class="opt"><input type="radio" name="opt" value="${i}" ${checked}> <span class="mono">${label}.</span> ${o}</label>`;
+      }).join('');
+      document.getElementById('qcount').textContent = `${state.idx+1}/${state.questions.length}`;
+    }
+
+    function tick() {
+      state.remaining -= 1;
+      if (state.remaining <= 0) return submit();
+      document.getElementById('timer').textContent = `${Math.floor(state.remaining/60)}:${String(state.remaining%60).padStart(2,'0')}`;
+      requestAnimationFrame(()=>{});
+      setTimeout(tick, 1000);
+    }
+
+    function saveDeltaTime() {
+      const now = Date.now();
+      const delta = now - state.qStart;
+      const q = state.questions[state.idx];
+      PQ.saveAnswer(state.attempt.id, q.id, (getChosenIndex() ?? (state.attempt.answers.find(a=>a.questionId===q.id)?.chosenIndex ?? null)), delta);
+      state.qStart = now;
+    }
+
+    function getChosenIndex() {
+      const sel = document.querySelector('input[name="opt"]:checked');
+      return sel ? Number(sel.value) : null;
+    }
+
+    function next() {
+      saveDeltaTime();
+      if (state.idx < state.questions.length - 1) { state.idx += 1; render(); }
+    }
+    function prev() {
+      saveDeltaTime();
+      if (state.idx > 0) { state.idx -= 1; render(); }
+    }
+    function submit() {
+      saveDeltaTime();
+      const done = PQ.submitAttempt(state.attempt.id);
+      location.href = `review.html?attemptId=${done.id}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.PQ) return;
+      const attemptId = qparam('attemptId');
+      const attempt = PQ.getAttemptById(attemptId);
+      if (!attempt) { document.body.innerHTML = '<div class="container"><p>Attempt not found.</p></div>'; return; }
+      const test = PQ.getTestById(attempt.testId);
+      const questions = PQ.getQuestionsByIds(test.questionIds);
+      state = { attempt, test, questions, idx: 0, qStart: Date.now(), remaining: test.durationSec };
+      render();
+      document.getElementById('timer').textContent = `${Math.floor(state.remaining/60)}:${String(state.remaining%60).padStart(2,'0')}`;
+      setTimeout(tick, 1000);
+
+      document.getElementById('opts').addEventListener('change', (e) => {
+        const idx = Number(e.target.value);
+        if (Number.isFinite(idx)) {
+          PQ.saveAnswer(state.attempt.id, state.questions[state.idx].id, idx, 0);
+        }
+      });
+      document.getElementById('next').addEventListener('click', next);
+      document.getElementById('prev').addEventListener('click', prev);
+      document.getElementById('submit').addEventListener('click', submit);
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <nav class="nav" data-nav>
+      <div class="brand"><span class="logo"></span> PrepQuest</div>
+      <div class="nav-links">
+        <a href="index.html">Dashboard</a>
+        <a href="tests.html">Tests</a>
+        <a href="analytics.html">Analytics</a>
+        <a href="contests.html">Contests</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="simulator.html">Interview Simulator</a>
+      </div>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1 id="test-name">Take Test</h1>
+        <p id="q-meta" class="muted">—</p>
+      </div>
+      <div class="row">
+        <div class="stat"><div class="label">Time Left</div><div class="value" id="timer">—</div></div>
+        <div class="stat"><div class="label">Question</div><div class="value" id="qcount">—</div></div>
+      </div>
+    </section>
+    <div class="take-grid section">
+      <div>
+        <div class="card"><div class="card-body">
+          <div id="stem" style="font-weight:600">—</div>
+          <div id="opts" class="opts"></div>
+          <div style="margin-top:12px; display:flex; gap:10px">
+            <button class="btn" id="prev">Previous</button>
+            <button class="btn" id="next">Next</button>
+            <button class="btn danger" id="submit">Submit</button>
+          </div>
+        </div></div>
+      </div>
+      <aside>
+        <div class="card"><div class="card-body">
+          <h3>Navigator</h3>
+          <p class="muted">Use Next/Previous to move between questions.</p>
+        </div></div>
+      </aside>
+    </div>
+  </main>
+  <footer>© 2025 PrepQuest</footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const attemptId = qparam('attemptId'); const a = PQ.getAttemptById(attemptId); if (a) { const t = PQ.getTestById(a.testId); document.getElementById('test-name').textContent = t?.name || 'Take Test'; }
+    });
+  </script>
+</body>
+</html>
+
