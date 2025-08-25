@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrepQuest · Review</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script defer src="assets/data.js"></script>
+  <script defer src="assets/app.js"></script>
+  <style>
+    .review-layout { display:grid; grid-template-columns: 300px 1fr; gap:16px; }
+    .q-list { max-height: 70vh; overflow:auto; }
+    .q-item { display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid var(--border); cursor:pointer; }
+    .q-item:hover { background: rgba(255,255,255,0.04); }
+    .q-detail .stem { font-weight: 600; margin-bottom: 8px; }
+    .explanation { margin-top: 12px; color: var(--muted); }
+    @media (max-width: 920px) { .review-layout { grid-template-columns: 1fr; } }
+  </style>
+  <script>
+    function qparam(name) { const u = new URL(location.href); return u.searchParams.get(name); }
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.PQ) return;
+      const attemptId = qparam('attemptId');
+      const attempt = PQ.getAttemptById(attemptId);
+      const test = attempt ? PQ.getTestById(attempt.testId) : null;
+      const questions = test ? PQ.getQuestionsByIds(test.questionIds) : [];
+      const ansMap = new Map((attempt?.answers||[]).map(a => [a.questionId, a]));
+
+      const list = document.getElementById('q-list');
+      const detail = document.getElementById('q-detail');
+      const overall = document.getElementById('overall');
+
+      let correctCount = 0; let totalTime = 0;
+      const enriched = questions.map((q, i) => {
+        const a = ansMap.get(q.id) || { chosenIndex: null, timeMs: 0 };
+        const correct = a.chosenIndex === q.correctIndex;
+        if (correct) correctCount += 1;
+        totalTime += a.timeMs||0;
+        return { idx: i+1, stem: q.stem, topic: q.topic, difficulty: q.difficulty, timeMs: a.timeMs||0, correct, userAnswer: a.chosenIndex!=null? String.fromCharCode(65+a.chosenIndex):'—', correctAnswer: String.fromCharCode(65+q.correctIndex), explanation: q.explanation };
+      });
+
+      overall.innerHTML = `
+        <div class="row">
+          <div class="stat"><div class="label">Score</div><div class="value">${attempt?.scorePercent ?? Math.round((correctCount/enriched.length)*100)}%</div></div>
+          <div class="stat"><div class="label">Correct</div><div class="value">${correctCount}/${enriched.length}</div></div>
+          <div class="stat"><div class="label">Total Time</div><div class="value">${Math.round((attempt?.totalTimeMs ?? totalTime)/1000)}s</div></div>
+        </div>`;
+
+      function renderList() {
+        list.innerHTML = '';
+        enriched.forEach(q => {
+          const row = document.createElement('div');
+          row.className = 'q-item';
+          row.innerHTML = `
+            <div>
+              <div><strong>#${q.idx}</strong> <span class="muted">${q.topic} • ${q.difficulty}</span></div>
+              <div class="q-timebar" style="margin-top:6px"><span style="width:${Math.min(100,(q.timeMs/45000)*100)}%"></span></div>
+            </div>
+            <span class="pill ${q.correct ? 'good' : 'bad'}">${q.correct ? 'Correct' : 'Wrong'}</span>
+          `;
+          row.addEventListener('click', () => renderDetail(q));
+          list.appendChild(row);
+        });
+      }
+
+      function renderDetail(q) {
+        detail.innerHTML = `
+          <div class="card"><div class="card-body">
+            <div class="muted">${q.topic} • ${q.difficulty} • Time: ${Math.round(q.timeMs/1000)}s</div>
+            <div class="stem">${q.stem}</div>
+            <div> Your answer: <span class="pill ${q.correct ? 'good' : 'bad'}">${q.userAnswer}</span> &nbsp; Correct: <span class="pill">${q.correctAnswer}</span></div>
+            <div class="explanation">
+              <strong>Explanation:</strong> ${q.explanation}
+            </div>
+          </div></div>
+        `;
+      }
+
+      if (enriched.length) { renderList(); renderDetail(enriched[0]); }
+      else { detail.innerHTML = '<div class="card"><div class="card-body">No attempt data found.</div></div>'; }
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <nav class="nav" data-nav>
+      <div class="brand"><span class="logo"></span> PrepQuest</div>
+      <div class="nav-links">
+        <a href="index.html">Dashboard</a>
+        <a href="tests.html">Tests</a>
+        <a href="analytics.html">Analytics</a>
+        <a href="contests.html">Contests</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="simulator.html">Interview Simulator</a>
+      </div>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1>Review</h1>
+        <p class="muted">Per-question time, correctness, and explanations.</p>
+      </div>
+      <div id="overall"></div>
+    </section>
+    <div class="review-layout section">
+      <div class="card"><div class="card-body q-list" id="q-list"></div></div>
+      <div id="q-detail"></div>
+    </div>
+  </main>
+  <footer>© 2025 PrepQuest</footer>
+</body>
+</html>
+

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrepQuest · Tests</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script defer src="assets/data.js"></script>
+  <script defer src="assets/app.js"></script>
+  <style> .tests-grid { display:grid; grid-template-columns: repeat(12,1fr); gap:16px; } .tests-grid > .card { grid-column: span 6; } @media(max-width:920px){ .tests-grid > .card { grid-column: span 12; } } </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.PQ) return;
+      const grid = document.getElementById('tests-grid');
+      const tests = PQ.getTests();
+      grid.innerHTML = tests.map(t => `
+        <div class=\"card\"><div class=\"card-body\">
+          <h3>${t.name}</h3>
+          <p class=\"muted\">${t.questionIds.length} questions · ${Math.round(t.durationSec/60)} min</p>
+          <div><button class=\"btn primary\" data-start=\"${t.id}\">Start</button></div>
+        </div></div>`).join('');
+      grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-start]'); if (!btn) return;
+        const att = PQ.startAttempt(btn.getAttribute('data-start'));
+        location.href = `take.html?attemptId=${att.id}`;
+      });
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <nav class="nav" data-nav>
+      <div class="brand"><span class="logo"></span> PrepQuest</div>
+      <div class="nav-links">
+        <a href="index.html">Dashboard</a>
+        <a href="tests.html">Tests</a>
+        <a href="analytics.html">Analytics</a>
+        <a href="contests.html">Contests</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="simulator.html">Interview Simulator</a>
+      </div>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1>Practice Tests</h1>
+        <p class="muted">Topic-wise and company-wise mocks. Focus where it matters.</p>
+      </div>
+    </section>
+    <section class="section tests-grid" id="tests-grid"></section>
+  </main>
+  <footer>© 2025 PrepQuest</footer>
+</body>
+</html>
+
