@@ -38,7 +38,13 @@
     plQ.push(addQ('Gain of 20% on cost implies what % on selling price?', ['16.67%','18%','20%','25%'], 0, 'Aptitude', 'Medium', 'If CP=100, SP=120. Profit over SP: 20/120 = 16.67%.', 'pl-basic'));
     tests.push({ id: 'pl-basic', name: 'Profit & Loss Basics', durationSec: 900, negativeMarking: false, topics: ['Aptitude'], questionIds: plQ });
 
-    writeStore({ seeded: true, tests, questions, attempts: [] });
+    const users = [
+      { id: 'u1', name: 'Prince', xp: 0, badges: [], streak: 0, lastActiveDay: null },
+      { id: 'u2', name: 'Alex', xp: 3240, badges: ['\ud83c\udfc6'], streak: 5, lastActiveDay: '2025-08-10' },
+      { id: 'u3', name: 'Priya', xp: 2990, badges: ['\ud83e\udd0f'], streak: 3, lastActiveDay: '2025-08-09' },
+      { id: 'u4', name: 'Rahul', xp: 2855, badges: ['\ud83c\udf1f'], streak: 2, lastActiveDay: '2025-08-08' }
+    ];
+    writeStore({ seeded: true, tests, questions, attempts: [], users });
   }
 
   function getTests() { seedIfNeeded(); return readStore().tests || []; }
@@ -86,11 +92,68 @@
     attempt.finishedAt = Date.now();
     attempt.accuracy = test.questionIds.length ? Math.round((correct / test.questionIds.length)*100) : 0;
     attempt.scorePercent = attempt.accuracy; // 1:1 for now
+    // Compute percentile for this test
+    attempt.percentile = computePercentileForTestInternal(db, attempt.testId, attempt.scorePercent);
+    // Update user stats (xp, streaks, badges)
+    updateUserOnAttemptInternal(db, attempt);
     writeStore(db);
     return attempt;
   }
 
-  window.PQ = { getTests, getTestById, getQuestionsByIds, getAttempts, getAttemptById, startAttempt, saveAnswer, submitAttempt };
+  // ----- Extras: users, leaderboard, percentiles, streaks/badges -----
+  function getUsers() { seedIfNeeded(); return readStore().users || []; }
+  function getUser(userId='u1') { seedIfNeeded(); return (readStore().users||[]).find(u=>u.id===userId); }
+  function saveUserInternal(db, user) {
+    const idx = (db.users||[]).findIndex(u=>u.id===user.id);
+    if (idx >= 0) db.users[idx] = user; else (db.users||[]).push(user);
+  }
+  function todayStr() { return new Date().toISOString().slice(0,10); }
+  function computePercentileForTestInternal(db, testId, scorePercent) {
+    const scores = (db.attempts||[])
+      .filter(a=>a.testId===testId && typeof a.scorePercent === 'number')
+      .map(a=>a.scorePercent);
+    if (!scores.length) return 0;
+    const less = scores.filter(s => s < scorePercent).length;
+    const equal = scores.filter(s => s === scorePercent).length;
+    return Math.round(100 * (less + 0.5*equal) / scores.length);
+  }
+  function updateUserOnAttemptInternal(db, attempt, userId='u1') {
+    let user = (db.users||[]).find(u=>u.id===userId);
+    if (!user) { user = { id: userId, name: 'You', xp: 0, badges: [], streak: 0, lastActiveDay: null }; (db.users||[]).push(user); }
+    const day = todayStr();
+    if (user.lastActiveDay === day) {
+      // same day, keep streak
+    } else if (user.lastActiveDay) {
+      const prev = new Date(user.lastActiveDay);
+      const cur = new Date(day);
+      const diff = Math.round((cur - prev)/(1000*60*60*24));
+      user.streak = diff === 1 ? (user.streak+1) : 1;
+      user.lastActiveDay = day;
+    } else {
+      user.streak = 1; user.lastActiveDay = day;
+    }
+    // XP: base + performance
+    const numQuestions = (readStore().tests.find(t=>t.id===attempt.testId)?.questionIds.length) || 0;
+    const avgTimePerQ = numQuestions ? Math.round((attempt.totalTimeMs||0)/numQuestions/1000) : 0;
+    const baseXp = 10;
+    const perfXp = Math.round((attempt.scorePercent||0));
+    const streakXp = Math.min(20, user.streak * 2);
+    user.xp = (user.xp||0) + baseXp + perfXp + streakXp;
+    // Badges
+    const attemptsByUser = (db.attempts||[]).filter(a=>a.userId===user.id);
+    if (!user.badges.includes('\ud83c\udfaf') && attemptsByUser.length <= 1) user.badges.push('\ud83c\udfaf'); // First Attempt
+    if (!user.badges.includes('\ud83e\uddec') && (attempt.scorePercent||0) >= 80) user.badges.push('\ud83e\uddec'); // High Scorer
+    if (!user.badges.includes('\u26a1\ufe0f') && avgTimePerQ > 0 && avgTimePerQ <= 45) user.badges.push('\u26a1\ufe0f'); // Quick Thinker
+    if (!user.badges.includes('\ud83d\udd25') && user.streak >= 3) user.badges.push('\ud83d\udd25'); // 3-day Streak
+    saveUserInternal(db, user);
+  }
+  function getLeaderboard(limit=20) {
+    seedIfNeeded();
+    const users = (readStore().users||[]).slice().sort((a,b)=> (b.xp||0) - (a.xp||0));
+    return users.slice(0, limit);
+  }
+
+  window.PQ = { getTests, getTestById, getQuestionsByIds, getAttempts, getAttemptById, startAttempt, saveAnswer, submitAttempt, getUsers, getUser, getLeaderboard };
   seedIfNeeded();
 })();
 

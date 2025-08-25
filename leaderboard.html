@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrepQuest · Leaderboard</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script defer src="assets/data.js"></script>
+  <script defer src="assets/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.PQ) return;
+      const rows = PQ.getLeaderboard().map((u, i) => `
+        <tr><td>${i+1}</td><td>${u.name}</td><td>${u.xp}</td><td>${(u.badges||[]).join(' ')||'—'}</td></tr>
+      `).join('');
+      document.getElementById('lb-body').innerHTML = rows;
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <nav class="nav" data-nav>
+      <div class="brand"><span class="logo"></span> PrepQuest</div>
+      <div class="nav-links">
+        <a href="index.html">Dashboard</a>
+        <a href="tests.html">Tests</a>
+        <a href="analytics.html">Analytics</a>
+        <a href="contests.html">Contests</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="simulator.html">Interview Simulator</a>
+      </div>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1>Leaderboard</h1>
+        <p class="muted">Ranked by XP. Earn more by practicing and scoring high.</p>
+      </div>
+    </section>
+    <section class="section">
+      <div class="card"><div class="card-body">
+        <table>
+          <thead><tr><th>Rank</th><th>User</th><th>XP</th><th>Badges</th></tr></thead>
+          <tbody id="lb-body"></tbody>
+        </table>
+      </div></div>
+    </section>
+  </main>
+  <footer>© 2025 PrepQuest</footer>
+</body>
+</html>
+
